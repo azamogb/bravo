@@ -12,24 +12,26 @@ from email import encoders
 
 from dotenv import load_dotenv
 
-# --- Config -----------------------------------------------------------
-load_dotenv()  # reads .env file (if present) into os.environ
+from config import (
+    SENDER_EMAIL,
+    EMAIL_PASS,
+    SMTP_HOST,
+    SMTP_PORT,
+    MAX_ATTACHMENT_BYTES,
+    MAX_RETRIES,
+    RETRY_DELAY_SECONDS,
+)
 
-SENDER = "enomfonakpanudo@gmail.com"
 
-MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024  # Gmail's per-message limit is 25MB
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-MAX_RETRIES = 3
-RETRY_DELAY_SECONDS = 5
+load_dotenv() 
 
-# --- Logging ------------------------------------------------------------
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(),               
-        logging.FileHandler("emailer.log"),    
+        logging.StreamHandler(),
+        logging.FileHandler("emailer.log"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ def send_email(
     to_email,
     subject,
     body,
+    attachment_path=None,
     attachment_paths=None,
     cc_email=None,
     bcc_email=None,
@@ -87,18 +90,20 @@ def send_email(
         to_email: str, single recipient or comma-separated list.
         subject: str
         body: str, plain-text body.
-        attachment_paths: str, or list of str file paths. Optional.
+        attachment_path: str, single file path. Matches the team's agreed
+            interface (send_email(to_email, subject, body, attachment_path=None)).
+        attachment_paths: str, or list of str file paths. Optional extra —
+            use this if you need to attach more than one file.
         cc_email: str, single or comma-separated CC recipients. Optional.
         bcc_email: str, single or comma-separated BCC recipients. Optional.
     """
-    # 1. Get password from environment (now populated via .env too)
-    password = os.environ.get("EMAIL_PASS")
-    if not password:
+    # 1. Get password from config (sourced from EMAIL_PASS env var / .env)
+    if not EMAIL_PASS:
         raise ValueError("Set EMAIL_PASS env variable (or add it to a .env file)!")
 
     # 2. Build message
     msg = MIMEMultipart()
-    msg["From"] = SENDER
+    msg["From"] = SENDER_EMAIL
     msg["To"] = to_email
     msg["Subject"] = subject
     if cc_email:
@@ -108,19 +113,25 @@ def send_email(
     # it wouldn't be "blind" anymore.
     msg.attach(MIMEText(body, "plain"))
 
-    # 3. Attach file(s) if provided -- accepts a single path or a list
+    # 3. Merge the singular (team contract) and plural attachment args
+    #    into one list, then attach each file if provided.
+    all_attachments = []
+    if attachment_path:
+        all_attachments.append(attachment_path)
     if attachment_paths:
         if isinstance(attachment_paths, str):
-            attachment_paths = [attachment_paths]
+            all_attachments.append(attachment_paths)
+        else:
+            all_attachments.extend(attachment_paths)
 
-        for path in attachment_paths:
-            try:
-                part = _build_attachment_part(path)
-                msg.attach(part)
-                logger.info(f"Attached file: {path}")
-            except (FileNotFoundError, ValueError) as e:
-                logger.error(str(e))
-                raise
+    for path in all_attachments:
+        try:
+            part = _build_attachment_part(path)
+            msg.attach(part)
+            logger.info(f"Attached file: {path}")
+        except (FileNotFoundError, ValueError) as e:
+            logger.error(str(e))
+            raise
 
     # 4. Work out the full envelope recipient list (To + Cc + Bcc)
     recipients = [addr.strip() for addr in to_email.split(",")]
@@ -136,8 +147,8 @@ def send_email(
         try:
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
                 server.starttls()
-                server.login(SENDER, password)
-                server.sendmail(SENDER, recipients, msg.as_string())
+                server.login(SENDER_EMAIL, EMAIL_PASS)
+                server.sendmail(SENDER_EMAIL, recipients, msg.as_string())
             logger.info(f"Email sent to {to_email} (cc={cc_email}, bcc={bcc_email})")
             return
         except smtplib.SMTPAuthenticationError as e:
