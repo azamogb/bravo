@@ -1,12 +1,16 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import random
 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from charts import ChartPanel
+from reports import (
+    technical_report,
+    stakeholder_report,
+    save_report_to_file
+)
 
 
-# Colour palette
+# =========================================================
+# Colour Palette
 BG = "#F3F1EB"
 CARD = "#FFFFFF"
 TEXT = "#303030"
@@ -23,20 +27,11 @@ LIGHT_YELLOW = "#FAF0DC"
 ORANGE = "#D96A3B"
 
 BORDER = "#D7D5CF"
-GRAPH_GRID = "#E5E3DD"
 
 
-# Temporary data for GUI testing.
-#
-# Expected file:
-#     data_loader.py
-#
-# Expected function:
-#     load_data()
-#
-# Expected return:
-#     pandas DataFrame containing the well records and fields
-#     required by the dashboard.
+
+# Temporary Risk Data
+# This will later be replaced by predict.py.
 
 WELL_RISK = {
     "WELL-01": 82,
@@ -46,95 +41,44 @@ WELL_RISK = {
     "WELL-05": 21
 }
 
-
-RISK_HISTORY = {
-    "WELL-01": [61, 58, 67, 74, 82],
-    "WELL-02": [20, 18, 17, 15, 14],
-    "WELL-03": [43, 47, 51, 55, 58],
-    "WELL-04": [14, 12, 11, 10, 9],
-    "WELL-05": [28, 25, 24, 23, 21]
-}
-
-
-# Temporary metric values for GUI testing.
-#
-# Expected fields from data_loader.py:
-#     Oil_Rate
-#     Gas_Rate
-#     Pressure
-#     Water_Cut
-#     Choke_Position
-#     Vibration
-#     Motor_Current
-#     Date
-
-METRICS = {
-    "oil": {
-        "label": "Oil Rate",
-        "title": "Oil Production",
-        "unit": "bbl/day",
-        "data": [100, 120, 115, 140, 135, 145, 132]
-    },
-
-    "gas": {
-        "label": "Gas Rate",
-        "title": "Gas Production",
-        "unit": "MMscf/day",
-        "data": [50, 65, 60, 75, 80, 78, 85]
-    },
-
-    "pressure": {
-        "label": "Pressure",
-        "title": "Well Pressure",
-        "unit": "psi",
-        "data": [70, 75, 72, 78, 80, 77, 82]
-    },
-
-    "water": {
-        "label": "Water Cut",
-        "title": "Water Cut",
-        "unit": "%",
-        "data": [20, 25, 23, 30, 28, 32, 29]
-    },
-
-    "choke": {
-        "label": "Choke Position",
-        "title": "Choke Position",
-        "unit": "%",
-        "data": [45, 50, 48, 55, 60, 58, 63]
-    },
-
-    "vibration": {
-        "label": "Vibration",
-        "title": "Equipment Vibration",
-        "unit": "mm/s",
-        "data": [2.1, 2.5, 2.3, 3.1, 3.5, 3.2, 3.8]
-    },
-
-    "motor_current": {
-        "label": "Motor Current",
-        "title": "Motor Current",
-        "unit": "A",
-        "data": [18, 21, 20, 24, 27, 26, 29]
-    }
-}
-
-
-# Main window
+# Main Window
 window = tk.Tk()
 
-window.title("Digital Oilfield Monitor")
-window.geometry("1200x850")
-window.minsize(1050, 750)
-window.configure(bg=BG)
+window.title(
+    "Digital Oilfield Monitor"
+)
 
+window.geometry(
+    "1200x850"
+)
 
-# Tkinter variables
-well_var = tk.StringVar(value="WELL-01")
-current_metric = tk.StringVar(value="oil")
-current_period = tk.IntVar(value=7)
-threshold_var = tk.DoubleVar(value=75)
+window.minsize(
+    1050,
+    750
+)
 
+window.configure(
+    bg=BG
+)
+
+# Tkinter Variables
+well_var = tk.StringVar(
+    value="WELL-01"
+)
+
+current_metric = tk.StringVar(
+    value="oil"
+)
+
+current_period = tk.IntVar(
+    value=7
+)
+
+threshold_var = tk.DoubleVar(
+    value=75
+)
+
+# Widget References
 risk_label = None
 status_message = None
 threshold_label = None
@@ -144,6 +88,7 @@ well_labels = {}
 metric_buttons = {}
 period_buttons = {}
 
+chart_panel = None
 
 # Styles
 style = ttk.Style()
@@ -156,8 +101,15 @@ except tk.TclError:
 
 style.configure(
     "Modern.TButton",
-    font=("Segoe UI", 10, "bold"),
-    padding=(14, 7),
+    font=(
+        "Segoe UI",
+        10,
+        "bold"
+    ),
+    padding=(
+        14,
+        7
+    ),
     background=GREEN,
     foreground="white",
     borderwidth=0
@@ -166,26 +118,31 @@ style.configure(
 style.map(
     "Modern.TButton",
     background=[
-        ("active", GREEN_DARK),
-        ("pressed", GREEN_DARK)
+        (
+            "active",
+            GREEN_DARK
+        ),
+        (
+            "pressed",
+            GREEN_DARK
+        )
     ]
 )
 
 
 style.configure(
     "Modern.TCombobox",
-    font=("Segoe UI", 10),
+    font=(
+        "Segoe UI",
+        10
+    ),
     padding=6
 )
 
-
-# Helper functions
+# Helper Functions
 def create_card(parent, **kwargs):
     """
     Creates a reusable dashboard card.
-
-    The card provides a consistent background and border style
-    for the different sections of the dashboard.
     """
 
     return tk.Frame(
@@ -197,15 +154,24 @@ def create_card(parent, **kwargs):
     )
 
 
-def create_section_title(parent, text, row=0, column=0):
+def create_section_title(
+    parent,
+    text,
+    row=0,
+    column=0
+):
     """
-    Creates a consistent section heading for dashboard cards.
+    Creates a consistent section heading.
     """
 
     label = tk.Label(
         parent,
         text=text,
-        font=("Segoe UI", 11, "bold"),
+        font=(
+            "Segoe UI",
+            11,
+            "bold"
+        ),
         bg=CARD,
         fg=TEXT
     )
@@ -221,41 +187,58 @@ def create_section_title(parent, text, row=0, column=0):
 
 def get_risk_status(risk):
     """
-    Determines the risk classification and display colours.
+    Determines the risk classification.
 
-    The selected threshold determines the boundary between
-    HIGH RISK and WARNING.
+    The selected threshold determines the boundary
+    between HIGH RISK and WARNING.
     """
 
     threshold = threshold_var.get()
 
     if risk >= threshold:
-        return "HIGH RISK", RED, LIGHT_RED
+        return (
+            "HIGH RISK",
+            RED,
+            LIGHT_RED
+        )
 
     if risk >= 50:
-        return "WARNING", ORANGE, LIGHT_YELLOW
+        return (
+            "WARNING",
+            ORANGE,
+            LIGHT_YELLOW
+        )
 
-    return "NORMAL", GREEN, LIGHT_GREEN
+    return (
+        "NORMAL",
+        GREEN,
+        LIGHT_GREEN
+    )
 
-
-# Well status
+# Well Status
 def update_well_status():
     """
     Updates the status cards for all wells.
 
-    Integration:
-        Replace the temporary WELL_RISK values with risk scores
-        generated by the prediction module.
+    Temporary values are currently used.
+
+    Later integration:
+        Replace WELL_RISK with results from predict.py.
     """
 
     for well, label in well_labels.items():
 
         risk = WELL_RISK[well]
 
-        status, colour, background = get_risk_status(risk)
+        status, colour, background = (
+            get_risk_status(risk)
+        )
 
         label.config(
-            text=f"{well}\n{risk}%  {status}",
+            text=(
+                f"{well}\n"
+                f"{risk}%  {status}"
+            ),
             fg=colour,
             bg=background
         )
@@ -263,11 +246,10 @@ def update_well_status():
 
 def update_selected_well():
     """
-    Updates the selected well without running diagnostics.
+    Changes the selected well context.
 
-    Selecting a well only changes the selected-well context.
-    A new risk assessment is generated only when the user clicks
-    the Run Diagnostics button.
+    Selecting a well does not automatically run
+    diagnostics.
     """
 
     well = well_var.get()
@@ -278,21 +260,27 @@ def update_selected_well():
     )
 
     status_message.config(
-        text=f"{well} selected. Run diagnostics to assess current risk.",
+        text=(
+            f"{well} selected. "
+            "Run diagnostics to assess current risk."
+        ),
         fg=MUTED
     )
 
 
+# Diagnostics
 def run_diagnostics():
     """
-    Runs predictive maintenance diagnostics for the selected well.
+    Runs predictive maintenance diagnostics.
 
-    Integration:
-        Replace the temporary WELL_RISK lookup with the prediction
-        function supplied in predict.py.
+    Temporary risk values are currently used.
 
-    Expected function:
-        predict_risk(well_data)
+    Later integration:
+        Replace WELL_RISK lookup with:
+
+        predict_failure_risk(well)
+
+    from predict.py.
     """
 
     well = well_var.get()
@@ -302,7 +290,9 @@ def run_diagnostics():
         0
     )
 
-    status, colour, background = get_risk_status(risk)
+    status, colour, background = (
+        get_risk_status(risk)
+    )
 
     risk_label.config(
         text=f"{risk}%",
@@ -310,90 +300,46 @@ def run_diagnostics():
     )
 
     status_message.config(
-        text=f"Diagnostic result for {well}: {status}.",
+        text=(
+            f"Diagnostic result for "
+            f"{well}: {status}."
+        ),
         fg=colour
     )
 
-    plot_risk_trend()
-
-
-# Performance trend
-def generate_period_data(metric, days):
-    """
-    Generates temporary metric data for the selected time period.
-
-    This is used only for GUI testing.
-
-    Integration:
-        Replace this function with real historical data from
-        data_loader.py when database integration is completed.
-    """
-
-    base_data = METRICS[metric]["data"]
-
-    if days == 7:
-        return base_data
-
-    average = sum(base_data) / len(base_data)
-
-    variation = max(
-        average * 0.08,
-        1
-    )
-
-    values = []
-
-    for index in range(days):
-
-        source_value = base_data[
-            index % len(base_data)
-        ]
-
-        if index < len(base_data):
-
-            value = source_value
-
-        else:
-
-            value = source_value + random.uniform(
-                -variation,
-                variation
-            )
-
-        values.append(
-            round(value, 2)
-        )
-
-    return values
-
-
-def select_period(days):
-    """
-    Changes the Performance Trend time period.
-
-    Available periods:
-        7 days
-        15 days
-        30 days
-    """
-
-    current_period.set(days)
-
-    plot_chart(
-        current_metric.get()
+    chart_panel.plot_risk_trend(
+        well,
+        risk
     )
 
 
-def update_period_buttons():
+# =========================================================
+# Metric Selection
+# =========================================================
+
+def select_metric(metric):
     """
-    Updates the appearance of the time-period buttons.
+    Changes the selected performance metric.
     """
 
-    selected = current_period.get()
+    current_metric.set(metric)
 
-    for period, button in period_buttons.items():
+    update_metric_buttons()
 
-        if period == selected:
+    chart_panel.plot_performance(
+        metric,
+        current_period.get()
+    )
+
+
+def update_metric_buttons():
+    """
+    Updates the visual state of metric buttons.
+    """
+
+    for metric, button in metric_buttons.items():
+
+        if metric == current_metric.get():
 
             button.config(
                 bg=GREEN,
@@ -403,298 +349,63 @@ def update_period_buttons():
         else:
 
             button.config(
-                bg="#F5F4F0",
+                bg="#F4F3EF",
                 fg=TEXT
             )
 
 
-def plot_chart(metric):
+# Period Selection
+def select_period(days):
     """
-    Displays the selected production or equipment metric.
-
-    The chart can display:
-        - 7 days
-        - 15 days
-        - 30 days
-
-    Integration:
-        Replace the temporary generated values with historical
-        values from the DataFrame returned by data_loader.py.
-
-    The Date field from the DataFrame should be used for the
-    x-axis after integration.
+    Changes the performance trend period.
     """
 
-    current_metric.set(metric)
+    current_period.set(days)
 
-    metric_info = METRICS[metric]
+    update_period_buttons()
 
-    days = current_period.get()
-
-    values = generate_period_data(
-        metric,
+    chart_panel.plot_performance(
+        current_metric.get(),
         days
     )
 
-    title = metric_info["title"]
-    unit = metric_info["unit"]
 
-    ax.clear()
-
-    x_values = list(
-        range(days)
-    )
-
-    ax.plot(
-        x_values,
-        values,
-        marker="o" if days <= 15 else None,
-        linewidth=2.5,
-        markersize=4,
-        color=GREEN
-    )
-
-    ax.fill_between(
-        x_values,
-        values,
-        alpha=0.08,
-        color=GREEN
-    )
-
-    ax.set_title(
-        f"{title} - Last {days} Days",
-        fontsize=12,
-        fontweight="bold",
-        color=TEXT,
-        pad=10
-    )
-
-    ax.set_ylabel(
-        unit,
-        fontsize=9,
-        color=TEXT
-    )
-
-    if days == 7:
-
-        tick_positions = list(
-            range(7)
-        )
-
-        tick_labels = [
-            "Day 1",
-            "Day 2",
-            "Day 3",
-            "Day 4",
-            "Day 5",
-            "Day 6",
-            "Day 7"
-        ]
-
-        ax.set_xticks(
-            tick_positions
-        )
-
-        ax.set_xticklabels(
-            tick_labels
-        )
-
-    elif days == 15:
-
-        tick_positions = [
-            0,
-            2,
-            4,
-            6,
-            8,
-            10,
-            12,
-            14
-        ]
-
-        tick_labels = [
-            "Day 1",
-            "Day 3",
-            "Day 5",
-            "Day 7",
-            "Day 9",
-            "Day 11",
-            "Day 13",
-            "Day 15"
-        ]
-
-        ax.set_xticks(
-            tick_positions
-        )
-
-        ax.set_xticklabels(
-            tick_labels
-        )
-
-    else:
-
-        tick_positions = [
-            0,
-            4,
-            9,
-            14,
-            19,
-            24,
-            29
-        ]
-
-        tick_labels = [
-            "Day 1",
-            "Day 5",
-            "Day 10",
-            "Day 15",
-            "Day 20",
-            "Day 25",
-            "Day 30"
-        ]
-
-        ax.set_xticks(
-            tick_positions
-        )
-
-        ax.set_xticklabels(
-            tick_labels
-        )
-
-    ax.tick_params(
-        axis="both",
-        labelsize=8,
-        colors=MUTED
-    )
-
-    ax.grid(
-        axis="y",
-        linestyle="--",
-        linewidth=0.7,
-        color=GRAPH_GRID,
-        alpha=0.9
-    )
-
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    ax.spines["left"].set_color(BORDER)
-    ax.spines["bottom"].set_color(BORDER)
-
-    figure.tight_layout()
-
-    canvas.draw()
-
-    update_metric_buttons()
-    update_period_buttons()
-
-
-def update_metric_buttons():
+def update_period_buttons():
     """
-    Updates the appearance of the metric navigation buttons.
+    Updates the visual state of the period buttons.
     """
 
-    selected = current_metric.get()
+    for days, button in period_buttons.items():
 
-    for metric, button in metric_buttons.items():
-
-        if metric == selected:
+        if days == current_period.get():
 
             button.config(
                 bg=GREEN,
-                fg="white",
-                relief="flat"
+                fg="white"
             )
 
         else:
 
             button.config(
-                bg="#F5F4F0",
-                fg=TEXT,
-                relief="flat"
+                bg="#F4F3EF",
+                fg=TEXT
             )
 
 
-# Risk trend chart
-def plot_risk_trend():
-    """
-    Displays the recent diagnostic risk history for the selected well.
-
-    Integration:
-        Replace RISK_HISTORY with prediction results generated
-        by predict.py.
-    """
-
-    well = well_var.get()
-
-    values = RISK_HISTORY.get(
-        well,
-        [0, 0, 0, 0, 0]
-    )
-
-    risk_ax.clear()
-
-    runs = [
-        "Run 1",
-        "Run 2",
-        "Run 3",
-        "Run 4",
-        "Run 5"
-    ]
-
-    risk_ax.plot(
-        runs,
-        values,
-        marker="o",
-        linewidth=2.0,
-        markersize=4,
-        color=ORANGE
-    )
-
-    risk_ax.set_ylim(
-        0,
-        100
-    )
-
-    risk_ax.set_ylabel(
-        "Risk %",
-        fontsize=8,
-        color=TEXT
-    )
-
-    risk_ax.tick_params(
-        axis="both",
-        labelsize=7,
-        colors=MUTED
-    )
-
-    risk_ax.grid(
-        axis="y",
-        linestyle="--",
-        linewidth=0.6,
-        color=GRAPH_GRID
-    )
-
-    risk_ax.spines["top"].set_visible(False)
-    risk_ax.spines["right"].set_visible(False)
-
-    risk_ax.spines["left"].set_color(BORDER)
-    risk_ax.spines["bottom"].set_color(BORDER)
-
-    risk_figure.tight_layout()
-
-    risk_canvas.draw()
-
-
-# Alert threshold
+# Threshold
 def update_threshold(value):
     """
-    Updates the risk threshold displayed by the dashboard.
+    Updates the displayed threshold.
 
-    Changing the threshold does not run a new diagnostic.
+    Changing the threshold does not automatically
+    run diagnostics.
     """
 
     threshold = float(value)
+
+    threshold_var.set(
+        threshold
+    )
 
     threshold_label.config(
         text=f"{threshold:.0f}%"
@@ -702,81 +413,185 @@ def update_threshold(value):
 
     update_well_status()
 
-
-# Reports and email
-def technical_report():
+# Reports
+def show_technical_report():
     """
-    Generates the Technical Report for the selected well.
-
-    Project requirement:
-        - Mean values
-        - Maximum values
-        - Standard deviation
-
-    Integration:
-        Connect this function to reports.py.
+    Generates and displays the technical report.
     """
 
-    messagebox.showinfo(
+    well = well_var.get()
+
+    try:
+        report = technical_report(
+            well
+        )
+
+    except Exception as error:
+        messagebox.showerror(
+            "Report Error",
+            (
+                "The technical report could not "
+                "be generated yet.\n\n"
+                f"{error}"
+            )
+        )
+        return
+
+    show_report_window(
         "Technical Report",
-        "Technical report generation will be connected to the reporting module."
+        report
     )
 
 
-def stakeholder_report():
+def show_stakeholder_report():
     """
-    Generates the Stakeholder Report.
-
-    Project requirement:
-        - Total oil produced
-        - Field status
-
-    Integration:
-        Connect this function to reports.py.
+    Generates and displays the stakeholder report.
     """
 
-    messagebox.showinfo(
+    well = well_var.get()
+
+    try:
+        report = stakeholder_report(
+            well
+        )
+
+    except Exception as error:
+        messagebox.showerror(
+            "Report Error",
+            (
+                "The stakeholder report could "
+                "not be generated yet.\n\n"
+                f"{error}"
+            )
+        )
+        return
+
+    show_report_window(
         "Stakeholder Report",
-        "Stakeholder report generation will be connected to the reporting module."
+        report
     )
 
 
-def send_report():
+def show_report_window(title, report):
     """
-    Sends the generated report to the recipient entered by the user.
+    Displays a generated report in a separate
+    text window.
+    """
 
-    Integration:
-        Connect this function to the SMTP function from emailer.py.
+    report_window = tk.Toplevel(
+        window
+    )
+
+    report_window.title(
+        title
+    )
+
+    report_window.geometry(
+        "750x500"
+    )
+
+    report_window.configure(
+        bg=BG
+    )
+
+    text = tk.Text(
+        report_window,
+        font=(
+            "Consolas",
+            10
+        ),
+        bg=CARD,
+        fg=TEXT,
+        wrap="none",
+        padx=15,
+        pady=15
+    )
+
+    text.pack(
+        fill="both",
+        expand=True,
+        padx=15,
+        pady=15
+    )
+
+    text.insert(
+        "1.0",
+        report
+    )
+
+    text.config(
+        state="disabled"
+    )
+
+
+def save_current_report():
+    """
+    Saves a stakeholder report as a .txt file.
+    """
+
+    well = well_var.get()
+
+    try:
+        report = stakeholder_report(
+            well
+        )
+
+        filename = (
+            f"{well}_stakeholder_report.txt"
+        )
+
+        save_report_to_file(
+            report,
+            filename
+        )
+
+        messagebox.showinfo(
+            "Report Saved",
+            f"Report saved as:\n{filename}"
+        )
+
+    except Exception as error:
+
+        messagebox.showerror(
+            "Report Error",
+            (
+                "The report could not be saved.\n\n"
+                f"{error}"
+            )
+        )
+
+
+def email_report():
+    """
+    Placeholder for the SMTP email module.
+
+    This will later call send_email() from emailer.py.
     """
 
     email = email_entry.get().strip()
 
-    if not email or email == "name@company.com":
+    if not email:
 
         messagebox.showwarning(
             "Email Required",
-            "Please enter an email address."
-        )
-
-        return
-
-    if "@" not in email or "." not in email:
-
-        messagebox.showwarning(
-            "Invalid Email",
-            "Please enter a valid email address."
+            "Enter an email address first."
         )
 
         return
 
     messagebox.showinfo(
-        "Report Sent",
-        f"Report prepared for:\n{email}\n\n"
-        "SMTP integration can be connected here."
+        "Email Module",
+        (
+            "Email sending will be connected "
+            "when emailer.py is integrated."
+        )
     )
 
 
-# Main dashboard container
+# =========================================================
+# Main Dashboard Layout
+# =========================================================
+
 main = tk.Frame(
     window,
     bg=BG
@@ -786,474 +601,269 @@ main.pack(
     fill="both",
     expand=True,
     padx=18,
-    pady=12
+    pady=15
 )
 
 
-# Configure main responsive grid
-main.columnconfigure(
+main.grid_columnconfigure(
     0,
-    weight=3
+    weight=1
 )
 
-main.columnconfigure(
+main.grid_columnconfigure(
     1,
-    weight=2
+    weight=1
 )
 
-main.rowconfigure(
+main.grid_rowconfigure(
     2,
-    weight=4
+    weight=1
 )
-
 
 # Header
-header = create_card(main)
+header = create_card(
+    main
+)
 
 header.grid(
     row=0,
     column=0,
     columnspan=2,
     sticky="ew",
-    pady=(0, 8)
+    pady=(0, 12)
 )
 
+header.grid_columnconfigure(
+    0,
+    weight=1
+)
 
-header_content = tk.Frame(
+title_frame = tk.Frame(
     header,
     bg=CARD
 )
 
-header_content.grid(
+title_frame.grid(
     row=0,
-    column=0,
-    sticky="ew",
-    padx=18,
-    pady=10
-)
-
-header_content.columnconfigure(
-    0,
-    weight=1
-)
-
-
-tk.Label(
-    header_content,
-    text="Digital Oilfield Monitor",
-    font=("Segoe UI", 19, "bold"),
-    bg=CARD,
-    fg=TEXT
-).grid(
-    row=0,
-    column=0,
-    sticky="w"
-)
-
-
-tk.Label(
-    header_content,
-    text="Real-time production, equipment and risk monitoring",
-    font=("Segoe UI", 9),
-    bg=CARD,
-    fg=MUTED
-).grid(
-    row=1,
     column=0,
     sticky="w",
+    padx=18,
+    pady=12
+)
+
+tk.Label(
+    title_frame,
+    text="Digital Oilfield Monitor",
+    font=(
+        "Segoe UI",
+        20,
+        "bold"
+    ),
+    bg=CARD,
+    fg=TEXT
+).pack(
+    anchor="w"
+)
+
+tk.Label(
+    title_frame,
+    text=(
+        "Production Monitoring & "
+        "Predictive Maintenance"
+    ),
+    font=(
+        "Segoe UI",
+        9
+    ),
+    bg=CARD,
+    fg=MUTED
+).pack(
+    anchor="w",
     pady=(2, 0)
 )
 
 
-live_frame = tk.Frame(
-    header_content,
+# Well selection
+well_frame = tk.Frame(
+    header,
     bg=CARD
 )
 
-live_frame.grid(
+well_frame.grid(
     row=0,
     column=1,
-    rowspan=2,
-    sticky="e"
+    padx=18,
+    pady=12
 )
-
 
 tk.Label(
-    live_frame,
-    text="●",
-    font=("Segoe UI", 12),
-    bg=CARD,
-    fg=GREEN
-).grid(
-    row=0,
-    column=0,
-    padx=(0, 5)
-)
-
-
-tk.Label(
-    live_frame,
-    text="LIVE MONITORING",
-    font=("Segoe UI", 8, "bold"),
-    bg=CARD,
-    fg=GREEN_DARK
-).grid(
-    row=0,
-    column=1
-)
-
-
-# Well status card
-well_card = create_card(main)
-
-well_card.grid(
-    row=1,
-    column=0,
-    columnspan=2,
-    sticky="ew",
-    pady=(0, 8)
-)
-
-
-well_content = tk.Frame(
-    well_card,
-    bg=CARD
-)
-
-well_content.grid(
-    row=0,
-    column=0,
-    sticky="ew",
-    padx=14,
-    pady=8
-)
-
-well_content.columnconfigure(
-    0,
-    weight=1
-)
-
-
-create_section_title(
-    well_content,
-    "Well Status"
-)
-
-
-status_grid = tk.Frame(
-    well_content,
-    bg=CARD
-)
-
-status_grid.grid(
-    row=1,
-    column=0,
-    sticky="ew",
-    pady=(7, 7)
-)
-
-
-for index, well in enumerate(WELL_RISK):
-
-    status_grid.columnconfigure(
-        index,
-        weight=1
-    )
-
-    status_label = tk.Label(
-        status_grid,
-        text="",
-        font=("Segoe UI", 8, "bold"),
-        height=2,
-        relief="flat",
-        bd=0
-    )
-
-    status_label.grid(
-        row=0,
-        column=index,
-        padx=3,
-        sticky="ew"
-    )
-
-    well_labels[well] = status_label
-
-
-# Well controls
-control_frame = tk.Frame(
-    well_content,
-    bg=CARD
-)
-
-control_frame.grid(
-    row=2,
-    column=0,
-    sticky="ew"
-)
-
-
-tk.Label(
-    control_frame,
+    well_frame,
     text="Select Well",
-    font=("Segoe UI", 9, "bold"),
+    font=(
+        "Segoe UI",
+        9,
+        "bold"
+    ),
     bg=CARD,
-    fg=TEXT
+    fg=MUTED
 ).grid(
     row=0,
     column=0,
-    padx=(0, 7),
     sticky="w"
 )
 
-
-well_selector = ttk.Combobox(
-    control_frame,
+well_combo = ttk.Combobox(
+    well_frame,
     textvariable=well_var,
     values=list(WELL_RISK.keys()),
     state="readonly",
-    width=14,
+    width=15,
     style="Modern.TCombobox"
 )
 
-well_selector.grid(
-    row=0,
-    column=1,
-    sticky="w"
+well_combo.grid(
+    row=1,
+    column=0,
+    pady=(4, 0)
 )
 
-well_selector.bind(
+well_combo.bind(
     "<<ComboboxSelected>>",
     lambda event: update_selected_well()
 )
 
 
-ttk.Button(
-    control_frame,
-    text="Run Diagnostics",
-    command=run_diagnostics,
-    style="Modern.TButton"
-).grid(
-    row=0,
-    column=2,
-    padx=(10, 0),
-    sticky="w"
+# Well Status Card
+well_status_card = create_card(
+    main
 )
 
-
-# Performance trend card
-chart_card = create_card(main)
-
-chart_card.grid(
-    row=2,
+well_status_card.grid(
+    row=1,
     column=0,
     sticky="nsew",
-    padx=(0, 5),
-    pady=(0, 8)
+    padx=(0, 6),
+    pady=(0, 12)
 )
 
-chart_card.columnconfigure(
+well_status_card.grid_columnconfigure(
     0,
     weight=1
 )
-
-chart_card.rowconfigure(
-    2,
-    weight=1
-)
-
-
-# Performance trend header
-chart_header = tk.Frame(
-    chart_card,
-    bg=CARD
-)
-
-chart_header.grid(
-    row=0,
-    column=0,
-    sticky="ew",
-    padx=14,
-    pady=(9, 0)
-)
-
-chart_header.columnconfigure(
-    0,
-    weight=1
-)
-
 
 create_section_title(
-    chart_header,
-    "Performance Trend"
-)
-
-
-tk.Label(
-    chart_header,
-    text="Production and equipment operating trend",
-    font=("Segoe UI", 8),
-    bg=CARD,
-    fg=MUTED
+    well_status_card,
+    "Well Status"
 ).grid(
-    row=1,
+    row=0,
     column=0,
     sticky="w",
-    pady=(1, 0)
-)
-
-
-# Time period buttons
-period_frame = tk.Frame(
-    chart_header,
-    bg=CARD
-)
-
-period_frame.grid(
-    row=0,
-    column=1,
-    rowspan=2,
-    sticky="e"
-)
-
-
-periods = [
-    (7, "7 Days"),
-    (15, "15 Days"),
-    (30, "30 Days")
-]
-
-
-for index, (days, label) in enumerate(periods):
-
-    button = tk.Button(
-        period_frame,
-        text=label,
-        font=("Segoe UI", 8, "bold"),
-        bg="#F5F4F0",
-        fg=TEXT,
-        bd=0,
-        relief="flat",
-        cursor="hand2",
-        padx=10,
-        pady=5,
-        command=lambda value=days: select_period(value)
-    )
-
-    button.grid(
-        row=0,
-        column=index,
-        padx=2
-    )
-
-    period_buttons[days] = button
-
-
-# Performance chart
-chart_area = tk.Frame(
-    chart_card,
-    bg=CARD
-)
-
-chart_area.grid(
-    row=2,
-    column=0,
-    sticky="nsew",
-    padx=10,
-    pady=4
-)
-
-
-figure = Figure(
-    figsize=(7, 3),
-    dpi=100,
-    facecolor=CARD
-)
-
-ax = figure.add_subplot(111)
-
-ax.set_facecolor(CARD)
-
-
-canvas = FigureCanvasTkAgg(
-    figure,
-    master=chart_area
-)
-
-canvas.get_tk_widget().pack(
-    fill="both",
-    expand=True
-)
-
-
-# Risk assessment card
-risk_card = create_card(main)
-
-risk_card.grid(
-    row=2,
-    column=1,
-    sticky="nsew",
-    padx=(5, 0),
-    pady=(0, 8)
-)
-
-risk_card.columnconfigure(
-    0,
-    weight=1
-)
-
-risk_card.rowconfigure(
-    2,
-    weight=1
-)
-
-
-risk_content = tk.Frame(
-    risk_card,
-    bg=CARD
-)
-
-risk_content.grid(
-    row=0,
-    column=0,
-    sticky="nsew",
     padx=14,
-    pady=9
-)
-
-risk_content.columnconfigure(
-    0,
-    weight=1
-)
-
-risk_content.rowconfigure(
-    2,
-    weight=1
+    pady=(12, 8)
 )
 
 
-create_section_title(
-    risk_content,
-    "Risk Assessment"
-)
-
-
-risk_summary = tk.Frame(
-    risk_content,
+well_status_frame = tk.Frame(
+    well_status_card,
     bg=CARD
 )
 
-risk_summary.grid(
+well_status_frame.grid(
     row=1,
     column=0,
     sticky="ew",
-    pady=(7, 2)
+    padx=12,
+    pady=(0, 12)
+)
+
+for index, well in enumerate(WELL_RISK):
+
+    well_status_frame.grid_columnconfigure(
+        index,
+        weight=1
+    )
+
+    label = tk.Label(
+        well_status_frame,
+        text="",
+        font=(
+            "Segoe UI",
+            8,
+            "bold"
+        ),
+        justify="center",
+        padx=7,
+        pady=8
+    )
+
+    label.grid(
+        row=0,
+        column=index,
+        sticky="ew",
+        padx=3
+    )
+
+    well_labels[well] = label
+
+
+
+# Diagnostics Card
+diagnostics_card = create_card(
+    main
+)
+
+diagnostics_card.grid(
+    row=1,
+    column=1,
+    sticky="nsew",
+    padx=(6, 0),
+    pady=(0, 12)
+)
+
+diagnostics_card.grid_columnconfigure(
+    0,
+    weight=1
+)
+
+create_section_title(
+    diagnostics_card,
+    "Predictive Maintenance"
+).grid(
+    row=0,
+    column=0,
+    sticky="w",
+    padx=14,
+    pady=(12, 5)
+)
+
+
+diagnostics_content = tk.Frame(
+    diagnostics_card,
+    bg=CARD
+)
+
+diagnostics_content.grid(
+    row=1,
+    column=0,
+    sticky="ew",
+    padx=14,
+    pady=(0, 10)
+)
+
+diagnostics_content.grid_columnconfigure(
+    0,
+    weight=1
 )
 
 
 risk_label = tk.Label(
-    risk_summary,
+    diagnostics_content,
     text="--",
-    font=("Segoe UI", 22, "bold"),
+    font=(
+        "Segoe UI",
+        24,
+        "bold"
+    ),
     bg=CARD,
     fg=MUTED
 )
@@ -1266,387 +876,504 @@ risk_label.grid(
 
 
 status_message = tk.Label(
-    risk_summary,
-    text="WELL-01 selected. Run diagnostics to assess current risk.",
-    font=("Segoe UI", 8, "bold"),
+    diagnostics_content,
+    text=(
+        "Select a well and run diagnostics."
+    ),
+    font=(
+        "Segoe UI",
+        9
+    ),
     bg=CARD,
-    fg=MUTED,
-    wraplength=300,
-    justify="left"
+    fg=MUTED
 )
 
 status_message.grid(
     row=1,
     column=0,
     sticky="w",
-    pady=(2, 0)
+    pady=(2, 8)
 )
 
 
-risk_figure = Figure(
-    figsize=(4, 1.5),
-    dpi=100,
-    facecolor=CARD
+diagnostics_button = ttk.Button(
+    diagnostics_content,
+    text="Run Diagnostics",
+    style="Modern.TButton",
+    command=run_diagnostics
 )
 
-risk_ax = risk_figure.add_subplot(111)
-
-risk_ax.set_facecolor(CARD)
-
-
-risk_canvas = FigureCanvasTkAgg(
-    risk_figure,
-    master=risk_content
+diagnostics_button.grid(
+    row=0,
+    column=1,
+    rowspan=2,
+    padx=(20, 0)
 )
 
-risk_canvas.get_tk_widget().grid(
+
+# Performance Trend Card
+performance_card = create_card(
+    main
+)
+
+performance_card.grid(
     row=2,
     column=0,
     sticky="nsew",
-    pady=(2, 0)
+    padx=(0, 6),
+    pady=(0, 12)
 )
 
-
-# Alert threshold card
-threshold_card = create_card(main)
-
-threshold_card.grid(
-    row=3,
-    column=0,
-    columnspan=2,
-    sticky="ew",
-    pady=(0, 8)
-)
-
-
-threshold_content = tk.Frame(
-    threshold_card,
-    bg=CARD
-)
-
-threshold_content.grid(
-    row=0,
-    column=0,
-    sticky="ew",
-    padx=14,
-    pady=9
-)
-
-threshold_content.columnconfigure(
+performance_card.grid_rowconfigure(
     1,
     weight=1
 )
 
-
-create_section_title(
-    threshold_content,
-    "Alert Threshold"
-)
-
-
-tk.Label(
-    threshold_content,
-    text="Set the risk percentage at which a well becomes high risk.",
-    font=("Segoe UI", 8),
-    bg=CARD,
-    fg=MUTED
-).grid(
-    row=1,
-    column=0,
-    sticky="w",
-    pady=(2, 0)
-)
-
-
-threshold_scale = tk.Scale(
-    threshold_content,
-    from_=0,
-    to=100,
-    orient="horizontal",
-    variable=threshold_var,
-    command=update_threshold,
-    showvalue=False,
-    resolution=1,
-    bg=CARD,
-    fg=TEXT,
-    troughcolor="#E6E4DE",
-    activebackground=GREEN,
-    highlightthickness=0,
-    bd=0
-)
-
-threshold_scale.grid(
-    row=0,
-    column=1,
-    rowspan=2,
-    sticky="ew",
-    padx=(25, 10)
-)
-
-
-threshold_label = tk.Label(
-    threshold_content,
-    text="75%",
-    font=("Segoe UI", 13, "bold"),
-    bg=CARD,
-    fg=GREEN_DARK,
-    width=5
-)
-
-threshold_label.grid(
-    row=0,
-    column=2,
-    rowspan=2,
-    sticky="e"
-)
-
-
-# Metric navigation
-metric_card = create_card(main)
-
-metric_card.grid(
-    row=4,
-    column=0,
-    columnspan=2,
-    sticky="ew",
-    pady=(0, 8)
-)
-
-
-metric_content = tk.Frame(
-    metric_card,
-    bg=CARD
-)
-
-metric_content.grid(
-    row=0,
-    column=0,
-    sticky="ew",
-    padx=7,
-    pady=6
-)
-
-
-for index in range(7):
-
-    metric_content.columnconfigure(
-        index,
-        weight=1
-    )
-
-
-metric_names = [
-    ("oil", "Oil Rate"),
-    ("gas", "Gas Rate"),
-    ("pressure", "Pressure"),
-    ("water", "Water Cut"),
-    ("choke", "Choke Position"),
-    ("vibration", "Vibration"),
-    ("motor_current", "Motor Current")
-]
-
-
-for index, (metric, label) in enumerate(metric_names):
-
-    button = tk.Button(
-        metric_content,
-        text=label,
-        font=("Segoe UI", 8, "bold"),
-        bg="#F5F4F0",
-        fg=TEXT,
-        bd=0,
-        relief="flat",
-        cursor="hand2",
-        padx=4,
-        pady=6,
-        command=lambda m=metric: plot_chart(m)
-    )
-
-    button.grid(
-        row=0,
-        column=index,
-        padx=2,
-        sticky="ew"
-    )
-
-    metric_buttons[metric] = button
-
-
-# Reports and notifications
-report_card = create_card(main)
-
-report_card.grid(
-    row=5,
-    column=0,
-    columnspan=2,
-    sticky="ew"
-)
-
-
-report_content = tk.Frame(
-    report_card,
-    bg=CARD
-)
-
-report_content.grid(
-    row=0,
-    column=0,
-    sticky="ew",
-    padx=14,
-    pady=8
-)
-
-report_content.columnconfigure(
-    3,
+performance_card.grid_columnconfigure(
+    0,
     weight=1
 )
 
 
-create_section_title(
-    report_content,
-    "Reports & Notifications"
+performance_header = tk.Frame(
+    performance_card,
+    bg=CARD
 )
 
+performance_header.grid(
+    row=0,
+    column=0,
+    sticky="ew",
+    padx=14,
+    pady=(10, 5)
+)
 
-tk.Label(
-    report_content,
-    text="Generate reports or send results to stakeholders.",
-    font=("Segoe UI", 8),
-    bg=CARD,
-    fg=MUTED
+performance_header.grid_columnconfigure(
+    0,
+    weight=1
+)
+
+create_section_title(
+    performance_header,
+    "Performance Trend"
 ).grid(
-    row=1,
+    row=0,
     column=0,
     sticky="w"
 )
 
 
-ttk.Button(
-    report_content,
-    text="Technical Report",
-    command=technical_report,
-    style="Modern.TButton"
+period_frame = tk.Frame(
+    performance_header,
+    bg=CARD
+)
+
+period_frame.grid(
+    row=0,
+    column=1,
+    sticky="e"
+)
+
+
+for column, days in enumerate([7, 15, 30]):
+
+    button = tk.Button(
+        period_frame,
+        text=f"{days}D",
+        font=(
+            "Segoe UI",
+            8,
+            "bold"
+        ),
+        relief="flat",
+        borderwidth=0,
+        padx=8,
+        pady=4,
+        command=lambda d=days: select_period(d)
+    )
+
+    button.grid(
+        row=0,
+        column=column,
+        padx=2
+    )
+
+    period_buttons[days] = button
+
+
+performance_chart_frame = tk.Frame(
+    performance_card,
+    bg=CARD
+)
+
+performance_chart_frame.grid(
+    row=1,
+    column=0,
+    sticky="nsew",
+    padx=10,
+    pady=(0, 10)
+)
+
+
+# Risk Assessment Card
+risk_card = create_card(
+    main
+)
+
+risk_card.grid(
+    row=2,
+    column=1,
+    sticky="nsew",
+    padx=(6, 0),
+    pady=(0, 12)
+)
+
+risk_card.grid_rowconfigure(
+    1,
+    weight=1
+)
+
+risk_card.grid_columnconfigure(
+    0,
+    weight=1
+)
+
+
+create_section_title(
+    risk_card,
+    "Risk Assessment"
+).grid(
+    row=0,
+    column=0,
+    sticky="w",
+    padx=14,
+    pady=(10, 5)
+)
+
+
+risk_chart_frame = tk.Frame(
+    risk_card,
+    bg=CARD
+)
+
+risk_chart_frame.grid(
+    row=1,
+    column=0,
+    sticky="nsew",
+    padx=10,
+    pady=(0, 10)
+)
+
+
+# Create Chart Panel
+chart_panel = ChartPanel(
+    performance_chart_frame,
+    risk_parent=risk_chart_frame
+)
+
+# Bottom Controls
+bottom_frame = tk.Frame(
+    main,
+    bg=BG
+)
+
+bottom_frame.grid(
+    row=3,
+    column=0,
+    columnspan=2,
+    sticky="ew"
+)
+
+bottom_frame.grid_columnconfigure(
+    0,
+    weight=1
+)
+
+bottom_frame.grid_columnconfigure(
+    1,
+    weight=1
+)
+
+bottom_frame.grid_columnconfigure(
+    2,
+    weight=1
+)
+
+# Alert Threshold Card
+threshold_card = create_card(
+    bottom_frame
+)
+
+threshold_card.grid(
+    row=0,
+    column=0,
+    sticky="nsew",
+    padx=(0, 6)
+)
+
+create_section_title(
+    threshold_card,
+    "Alert Threshold"
+).grid(
+    row=0,
+    column=0,
+    sticky="w",
+    padx=12,
+    pady=(9, 2)
+)
+
+
+threshold_label = tk.Label(
+    threshold_card,
+    text="75%",
+    font=(
+        "Segoe UI",
+        15,
+        "bold"
+    ),
+    bg=CARD,
+    fg=RED
+)
+
+threshold_label.grid(
+    row=0,
+    column=1,
+    sticky="e",
+    padx=12,
+    pady=(9, 2)
+)
+
+
+threshold_scale = tk.Scale(
+    threshold_card,
+    from_=50,
+    to=95,
+    orient="horizontal",
+    variable=threshold_var,
+    showvalue=False,
+    resolution=1,
+    bg=CARD,
+    troughcolor="#E7E5DF",
+    highlightthickness=0,
+    command=update_threshold
+)
+
+threshold_scale.grid(
+    row=1,
+    column=0,
+    columnspan=2,
+    sticky="ew",
+    padx=12,
+    pady=(0, 8)
+)
+
+threshold_card.grid_columnconfigure(
+    0,
+    weight=1
+)
+
+# Metric Navigation Card
+metric_card = create_card(
+    bottom_frame
+)
+
+metric_card.grid(
+    row=0,
+    column=1,
+    sticky="nsew",
+    padx=6
+)
+
+create_section_title(
+    metric_card,
+    "Metrics"
+).grid(
+    row=0,
+    column=0,
+    columnspan=4,
+    sticky="w",
+    padx=12,
+    pady=(9, 5)
+)
+
+
+metrics = [
+    ("oil", "Oil"),
+    ("gas", "Gas"),
+    ("pressure", "Pressure"),
+    ("water", "Water"),
+    ("choke", "Choke"),
+    ("vibration", "Vibration"),
+    ("motor_current", "Motor")
+]
+
+
+for index, (metric, label) in enumerate(metrics):
+
+    row = 1 + (index // 4)
+    column = index % 4
+
+    button = tk.Button(
+        metric_card,
+        text=label,
+        font=(
+            "Segoe UI",
+            8,
+            "bold"
+        ),
+        relief="flat",
+        borderwidth=0,
+        padx=7,
+        pady=4,
+        command=lambda m=metric: select_metric(m)
+    )
+
+    button.grid(
+        row=row,
+        column=column,
+        padx=2,
+        pady=2
+    )
+
+    metric_buttons[metric] = button
+
+# Reports & Notifications Card
+reports_card = create_card(
+    bottom_frame
+)
+
+reports_card.grid(
+    row=0,
+    column=2,
+    sticky="nsew",
+    padx=(6, 0)
+)
+
+create_section_title(
+    reports_card,
+    "Reports & Notifications"
+).grid(
+    row=0,
+    column=0,
+    columnspan=2,
+    sticky="w",
+    padx=12,
+    pady=(9, 5)
+)
+
+
+report_buttons_frame = tk.Frame(
+    reports_card,
+    bg=CARD
+)
+
+report_buttons_frame.grid(
+    row=1,
+    column=0,
+    columnspan=2,
+    sticky="ew",
+    padx=10
+)
+
+
+tk.Button(
+    report_buttons_frame,
+    text="Technical",
+    font=(
+        "Segoe UI",
+        8,
+        "bold"
+    ),
+    relief="flat",
+    bg="#F4F3EF",
+    fg=TEXT,
+    padx=6,
+    pady=4,
+    command=show_technical_report
+).grid(
+    row=0,
+    column=0,
+    padx=2
+)
+
+
+tk.Button(
+    report_buttons_frame,
+    text="Stakeholder",
+    font=(
+        "Segoe UI",
+        8,
+        "bold"
+    ),
+    relief="flat",
+    bg="#F4F3EF",
+    fg=TEXT,
+    padx=6,
+    pady=4,
+    command=show_stakeholder_report
 ).grid(
     row=0,
     column=1,
-    rowspan=2,
-    padx=(20, 6)
+    padx=2
 )
 
 
-ttk.Button(
-    report_content,
-    text="Stakeholder Report",
-    command=stakeholder_report,
-    style="Modern.TButton"
+tk.Button(
+    report_buttons_frame,
+    text="Save",
+    font=(
+        "Segoe UI",
+        8,
+        "bold"
+    ),
+    relief="flat",
+    bg="#F4F3EF",
+    fg=TEXT,
+    padx=6,
+    pady=4,
+    command=save_current_report
 ).grid(
     row=0,
     column=2,
-    rowspan=2,
-    padx=(0, 12)
+    padx=2
 )
 
 
-# Email entry
-email_entry = tk.Entry(
-    report_content,
-    font=("Segoe UI", 9),
-    relief="solid",
-    bd=1
+email_entry = ttk.Entry(
+    reports_card,
+    width=22
 )
 
 email_entry.grid(
-    row=0,
-    column=3,
-    rowspan=2,
-    sticky="ew",
-    ipady=5,
-    padx=(0, 7)
+    row=2,
+    column=0,
+    padx=(12, 4),
+    pady=(7, 9)
 )
 
 email_entry.insert(
     0,
-    "name@company.com"
-)
-
-email_entry.config(
-    fg=MUTED
-)
-
-
-def clear_email_placeholder(event):
-    """
-    Removes the email placeholder when the entry field receives focus.
-    """
-
-    if email_entry.get() == "name@company.com":
-
-        email_entry.delete(
-            0,
-            tk.END
-        )
-
-        email_entry.config(
-            fg=TEXT
-        )
-
-
-def restore_email_placeholder(event):
-    """
-    Restores the email placeholder when no address has been entered.
-    """
-
-    if not email_entry.get().strip():
-
-        email_entry.insert(
-            0,
-            "name@company.com"
-        )
-
-        email_entry.config(
-            fg=MUTED
-        )
-
-
-email_entry.bind(
-    "<FocusIn>",
-    clear_email_placeholder
-)
-
-email_entry.bind(
-    "<FocusOut>",
-    restore_email_placeholder
+    "Enter email address"
 )
 
 
 ttk.Button(
-    report_content,
-    text="Send Report",
-    command=send_report,
-    style="Modern.TButton"
+    reports_card,
+    text="Email",
+    style="Modern.TButton",
+    command=email_report
 ).grid(
-    row=0,
-    column=4,
-    rowspan=2
+    row=2,
+    column=1,
+    padx=(4, 12),
+    pady=(7, 9)
 )
 
-
-# Initial display
+# Initial Dashboard State
 update_well_status()
-
-risk_label.config(
-    text="--",
-    fg=MUTED
-)
-
-status_message.config(
-    text=f"{well_var.get()} selected. Run diagnostics to assess current risk.",
-    fg=MUTED
-)
-
-plot_chart("oil")
 update_metric_buttons()
 update_period_buttons()
+update_selected_well()
 
 
 window.mainloop()
