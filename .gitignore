@@ -1,3 +1,9 @@
 venv/
 .env
 emailer.log
+__pycache__/
+__pycache__/
+*.pyc
+oilfield_project/models/*.pkl
+oilfield_project/reports/
+oilfield_project/data/*.db
