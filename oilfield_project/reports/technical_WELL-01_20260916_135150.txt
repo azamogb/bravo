@@ -1,0 +1,31 @@
+TECHNICAL REPORT - WELL-01
+ALPHA FLEET  |  Digital Oilfield Monitor
+Generated: 2026-09-16 13:51:50
+Period: 16 Jan 2024 to 30 Jan 2024 (15 daily records)
+
+Current failure risk: 100%  [HIGH RISK]
+Recorded failure days in period: 2
+
+Metric          Unit              Mean         Max     Std Dev
+--------------------------------------------------------------
+Oil Rate        bbl/day         352.70      495.25      124.88
+Gas Rate        Mscf/day        379.22      580.74      141.02
+GOR             scf/stb        1078.23     1270.18      140.66
+Water Cut       %                31.92       57.65       14.76
+Pressure        psi            1789.72     2648.67      483.12
+Temperature     °F               91.51      119.73       19.43
+Choke Position  %                61.29       99.60       21.82
+Vibration       mm/s              2.35        8.98        2.12
+Motor Current   A                54.38      127.04       23.16
+
+Latest readings:
+  Oil Rate            247.32 bbl/day
+  Gas Rate            303.76 Mscf/day
+  GOR                1228.17 scf/stb
+  Water Cut            40.97 %
+  Pressure           1791.24 psi
+  Temperature          60.47 °F
+  Choke Position       99.00 %
+  Vibration             2.58 mm/s
+  Motor Current        51.11 A
+  Pump status        RUNNING

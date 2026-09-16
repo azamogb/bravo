@@ -1,31 +1,33 @@
+import os
 import random
 import datetime
 import pandas as pd
 
+from config import CSV_PATH, WELL_IDS, NUM_DAYS
+
 random.seed(42)
 
-wells = [f'WELL-0{i}' for i in range(1, 6)]
 start_date = datetime.date(2026, 4, 1)
 rows = []
 
-for well in wells:
-    for day in range(30):
+for well in WELL_IDS:
+    for day in range(NUM_DAYS):
         is_failure = random.random() < 0.15
         pressure = random.uniform(1200, 2800)
 
         if is_failure:
             pressure *= 0.6
             oil_rate = random.uniform(50, 120)
-            vibration = random.uniform(4.0, 9.0)      
-            motor_current = random.uniform(80, 140)   
+            vibration = random.uniform(4.0, 9.0)
+            motor_current = random.uniform(80, 140)
         else:
             oil_rate = random.uniform(200, 500)
-            vibration = random.uniform(0.5, 3.0)      
-            motor_current = random.uniform(30, 60)    
+            vibration = random.uniform(0.5, 3.0)
+            motor_current = random.uniform(30, 60)
 
-        gas_rate = oil_rate * random.uniform(0.8, 1.5)      
-        gor = round((gas_rate * 1000) / oil_rate, 2) if oil_rate > 0 else 0  
-        choke_position = round(random.uniform(20, 100), 1) 
+        gas_rate = oil_rate * random.uniform(0.8, 1.5)
+        gor = round((gas_rate * 1000) / oil_rate, 2) if oil_rate > 0 else 0
+        choke_position = round(random.uniform(20, 100), 1)
 
         rows.append((
             well,
@@ -47,4 +49,9 @@ df = pd.DataFrame(rows, columns=[
     'Pressure', 'Temperature', 'Choke_Position', 'Vibration',
     'Motor_Current', 'Pump_Status'
 ])
-df.to_csv('production_data.csv', index=False)
+
+# Always written next to the project files, regardless of the
+# directory the script is launched from (db_setup.py reads it from
+# the same place).
+df.to_csv(CSV_PATH, index=False)
+print(f"Wrote {len(df)} rows to {CSV_PATH}")

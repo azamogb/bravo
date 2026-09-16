@@ -1,0 +1,31 @@
+TECHNICAL REPORT - WELL-01
+BRAVO FLEET  |  Digital Oilfield Monitor
+Generated: 2026-09-16 13:53:40
+Period: 01 Jan 2024 to 30 Jan 2024 (30 daily records)
+
+Current failure risk: 100%  [HIGH RISK]
+Recorded failure days in period: 6
+
+Metric          Unit              Mean         Max     Std Dev
+--------------------------------------------------------------
+Oil Rate        bbl/day         327.54      495.25      136.89
+Gas Rate        Mscf/day        352.67      703.21      154.44
+GOR             scf/stb        1084.93     1498.28      163.84
+Water Cut       %                28.04       57.65       15.38
+Pressure        psi            1764.20     2726.11      507.27
+Temperature     °F               89.54      119.73       19.00
+Choke Position  %                66.76       99.70       23.47
+Vibration       mm/s              2.70        8.98        2.26
+Motor Current   A                56.51      127.04       25.05
+
+Latest readings:
+  Oil Rate            247.32 bbl/day
+  Gas Rate            303.76 Mscf/day
+  GOR                1228.17 scf/stb
+  Water Cut            40.97 %
+  Pressure           1791.24 psi
+  Temperature          60.47 °F
+  Choke Position       99.00 %
+  Vibration             2.58 mm/s
+  Motor Current        51.11 A
+  Pump status        RUNNING

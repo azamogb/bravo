@@ -1,0 +1,21 @@
+STAKEHOLDER REPORT - FIELD SUMMARY
+ALPHA FLEET  |  Digital Oilfield Monitor
+Generated: 2026-09-16 13:50:26
+Period: 16 Jan 2024 to 30 Jan 2024 (15 days)
+
+FIELD STATUS: CRITICAL - immediate attention required
+
+Total oil produced : 23,815 bbl
+Total gas produced : 27,378 Mscf
+Average daily oil  : 1,588 bbl/day
+Wells monitored    : 5
+High-risk wells    : WELL-01, WELL-04
+Wells under watch  : none
+
+Well           Oil (bbl)    Gas (Mscf)    Risk  Status
+--------------------------------------------------------------
+WELL-01            5,291         5,688    100%  HIGH RISK
+WELL-02            4,905         5,426      1%  NORMAL
+WELL-03            5,159         6,012      0%  NORMAL
+WELL-04            3,834         4,492    100%  HIGH RISK
+WELL-05            4,626         5,760      0%  NORMAL

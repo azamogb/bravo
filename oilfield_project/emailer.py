@@ -1,171 +1,137 @@
-import os
-import time
-import logging
-import mimetypes
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
-from email.mime.audio import MIMEAudio
-from email import encoders
+"""
+Email sending for the dashboard (alerts and reports).
 
-from dotenv import load_dotenv
+    send_email(to, subject, body, attachments=None)
+
+    to           one address or a list of addresses
+    attachments  optional list of file paths to attach
+
+Uses the SMTP settings in config.py. The password is read from the
+EMAIL_PASS environment variable (config.EMAIL_PASS); for Gmail this
+must be an App Password, not the normal account password:
+    Google Account -> Security -> 2-Step Verification -> App passwords
+
+Set it before launching the app, e.g. in PowerShell:
+    $env:EMAIL_USER = "you@gmail.com"
+    $env:EMAIL_PASS = "abcd efgh ijkl mnop"
+"""
+
+import os
+import ssl
+import time
+import smtplib
+import mimetypes
+from email.message import EmailMessage
+from email.utils import formatdate
 
 from config import (
-    SENDER_EMAIL,
-    EMAIL_PASS,
-    SMTP_HOST,
-    SMTP_PORT,
-    MAX_ATTACHMENT_BYTES,
-    MAX_RETRIES,
-    RETRY_DELAY_SECONDS,
+    SENDER_EMAIL, EMAIL_PASS, SMTP_HOST, SMTP_PORT,
+    MAX_ATTACHMENT_BYTES, MAX_RETRIES, RETRY_DELAY_SECONDS,
 )
 
 
-load_dotenv() 
+class EmailConfigError(RuntimeError):
+    """Raised when the email settings are incomplete."""
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("emailer.log"),
-    ],
-)
-logger = logging.getLogger(__name__)
+def _normalise_recipients(to):
+    if isinstance(to, str):
+        to = [to]
+    recipients = [address.strip() for address in to if address and address.strip()]
+    if not recipients:
+        raise ValueError("No recipient address given.")
+    return recipients
 
 
-def _build_attachment_part(path):
-    """Read a single file from disk and return it as a MIME part,
-    auto-detecting its content type instead of forcing octet-stream."""
+def build_message(to, subject, body, attachments=None):
+    """Builds the EmailMessage (separate from sending so it can be tested)."""
 
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"Attachment not found: {path}")
+    recipients = _normalise_recipients(to)
 
-    size = os.path.getsize(path)
-    if size > MAX_ATTACHMENT_BYTES:
-        raise ValueError(
-            f"Attachment too large: {path} is {size / (1024*1024):.1f}MB "
-            f"(limit is {MAX_ATTACHMENT_BYTES / (1024*1024):.0f}MB)"
+    message = EmailMessage()
+    message["From"] = SENDER_EMAIL
+    message["To"] = ", ".join(recipients)
+    message["Subject"] = subject
+    message["Date"] = formatdate(localtime=True)
+    message.set_content(body)
+
+    total_bytes = 0
+    for path in attachments or []:
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Attachment not found: {path}")
+
+        size = os.path.getsize(path)
+        total_bytes += size
+        if total_bytes > MAX_ATTACHMENT_BYTES:
+            raise ValueError(
+                f"Attachments exceed the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB "
+                f"limit (adding {os.path.basename(path)})."
+            )
+
+        mime_type, _ = mimetypes.guess_type(path)
+        main_type, sub_type = (mime_type or "application/octet-stream").split("/", 1)
+
+        with open(path, "rb") as handle:
+            message.add_attachment(
+                handle.read(), maintype=main_type, subtype=sub_type,
+                filename=os.path.basename(path),
+            )
+
+    return message, recipients
+
+
+def send_email(to, subject, body, attachments=None):
+    """
+    Sends the email, retrying transient SMTP/network failures up to
+    MAX_RETRIES times. Raises on configuration problems or if every
+    attempt fails, so callers can show the reason to the user.
+    """
+
+    if not SENDER_EMAIL:
+        raise EmailConfigError("SENDER_EMAIL / EMAIL_USER is not set.")
+    if not EMAIL_PASS:
+        raise EmailConfigError(
+            "EMAIL_PASS environment variable is not set. For Gmail, create an "
+            "App Password and set EMAIL_PASS before starting the app."
         )
 
-    ctype, encoding = mimetypes.guess_type(path)
-    if ctype is None or encoding is not None:
-        # Fallback for unknown/compressed types
-        ctype = "application/octet-stream"
-    maintype, subtype = ctype.split("/", 1)
+    message, recipients = build_message(to, subject, body, attachments)
+    context = ssl.create_default_context()
+    last_error = None
 
-    with open(path, "rb") as f:
-        data = f.read()
-
-    if maintype == "image":
-        part = MIMEImage(data, _subtype=subtype)
-    elif maintype == "audio":
-        part = MIMEAudio(data, _subtype=subtype)
-    else:
-        part = MIMEBase(maintype, subtype)
-        part.set_payload(data)
-        encoders.encode_base64(part)
-
-    part.add_header(
-        "Content-Disposition", f"attachment; filename={os.path.basename(path)}"
-    )
-    return part
-
-
-def send_email(
-    to_email,
-    subject,
-    body,
-    attachment_path=None,
-    attachment_paths=None,
-    cc_email=None,
-    bcc_email=None,
-):
-    """Send an email via Gmail SMTP.
-
-    Args:
-        to_email: str, single recipient or comma-separated list.
-        subject: str
-        body: str, plain-text body.
-        attachment_path: str, single file path. Matches the team's agreed
-            interface (send_email(to_email, subject, body, attachment_path=None)).
-        attachment_paths: str, or list of str file paths. Optional extra —
-            use this if you need to attach more than one file.
-        cc_email: str, single or comma-separated CC recipients. Optional.
-        bcc_email: str, single or comma-separated BCC recipients. Optional.
-    """
-    # 1. Get password from config (sourced from EMAIL_PASS env var / .env)
-    if not EMAIL_PASS:
-        raise ValueError("Set EMAIL_PASS env variable (or add it to a .env file)!")
-
-    # 2. Build message
-    msg = MIMEMultipart()
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    if cc_email:
-        msg["Cc"] = cc_email
-    # Note: BCC is deliberately NOT added as a header -- it's only
-    # included in the actual envelope recipient list below, otherwise
-    # it wouldn't be "blind" anymore.
-    msg.attach(MIMEText(body, "plain"))
-
-    # 3. Merge the singular (team contract) and plural attachment args
-    #    into one list, then attach each file if provided.
-    all_attachments = []
-    if attachment_path:
-        all_attachments.append(attachment_path)
-    if attachment_paths:
-        if isinstance(attachment_paths, str):
-            all_attachments.append(attachment_paths)
-        else:
-            all_attachments.extend(attachment_paths)
-
-    for path in all_attachments:
-        try:
-            part = _build_attachment_part(path)
-            msg.attach(part)
-            logger.info(f"Attached file: {path}")
-        except (FileNotFoundError, ValueError) as e:
-            logger.error(str(e))
-            raise
-
-    # 4. Work out the full envelope recipient list (To + Cc + Bcc)
-    recipients = [addr.strip() for addr in to_email.split(",")]
-    if cc_email:
-        recipients += [addr.strip() for addr in cc_email.split(",")]
-    if bcc_email:
-        recipients += [addr.strip() for addr in bcc_email.split(",")]
-
-    # 5. Connect & send, with retries for transient failures
-    attempt = 0
-    while attempt < MAX_RETRIES:
-        attempt += 1
+    for attempt in range(1, MAX_RETRIES + 1):
         try:
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-                server.starttls()
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
                 server.login(SENDER_EMAIL, EMAIL_PASS)
-                server.sendmail(SENDER_EMAIL, recipients, msg.as_string())
-            logger.info(f"Email sent to {to_email} (cc={cc_email}, bcc={bcc_email})")
-            return
-        except smtplib.SMTPAuthenticationError as e:
-            # No point retrying bad credentials
-            logger.error(f"Authentication failed: {e}")
-            raise
-        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, OSError) as e:
-            logger.warning(
-                f"Attempt {attempt}/{MAX_RETRIES} failed to connect/send: {e}"
-            )
+                server.send_message(message, from_addr=SENDER_EMAIL,
+                                    to_addrs=recipients)
+            return True
+
+        except smtplib.SMTPAuthenticationError as error:
+            # Wrong password / app password: retrying will not help.
+            raise EmailConfigError(
+                "SMTP login was rejected. Check EMAIL_USER and EMAIL_PASS "
+                "(Gmail requires an App Password)."
+            ) from error
+
+        except (smtplib.SMTPException, OSError) as error:
+            last_error = error
+            print(f"emailer: attempt {attempt}/{MAX_RETRIES} failed: {error}")
             if attempt < MAX_RETRIES:
-                logger.info(f"Retrying in {RETRY_DELAY_SECONDS}s...")
                 time.sleep(RETRY_DELAY_SECONDS)
-            else:
-                logger.error("Max retries reached. Email not sent.")
-                raise
-        except smtplib.SMTPException as e:
-            # Any other SMTP-level error -- not necessarily worth retrying
-            logger.error(f"SMTP error: {e}")
-            raise
+
+    raise RuntimeError(
+        f"Could not send email after {MAX_RETRIES} attempts: {last_error}"
+    )
+
+
+if __name__ == "__main__":
+    import sys
+    target = sys.argv[1] if len(sys.argv) > 1 else SENDER_EMAIL
+    print(f"Sending test email to {target} ...")
+    send_email(target, "[Oilfield Monitor] Test email",
+               "If you can read this, emailer.py is configured correctly.")
+    print("Sent.")
