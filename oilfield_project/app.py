@@ -525,12 +525,9 @@ def save_current_report():
     Saves a stakeholder report as a .txt file.
     """
 
-    well = well_var.get()
 
     try:
-        report = stakeholder_report(
-            well
-        )
+        report = stakeholder_report()
 
         filename = "Stakeholder_report"
 
