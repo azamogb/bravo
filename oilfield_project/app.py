@@ -422,9 +422,7 @@ def show_technical_report():
     well = well_var.get()
 
     try:
-        report = technical_report(
-            well
-        )
+        report = technical_report()
 
     except Exception as error:
         messagebox.showerror(
@@ -451,9 +449,7 @@ def show_stakeholder_report():
     well = well_var.get()
 
     try:
-        report = stakeholder_report(
-            well
-        )
+        report = stakeholder_report()
 
     except Exception as error:
         messagebox.showerror(
@@ -536,9 +532,7 @@ def save_current_report():
             well
         )
 
-        filename = (
-            f"{well}_stakeholder_report.txt"
-        )
+        filename = "Stakeholder_report"
 
         save_report_to_file(
             report,
