@@ -22,15 +22,14 @@ import time
 import smtplib
 import mimetypes
 from email.message import EmailMessage
-from email.utils import formatdate
-from dotenv import load_dotenv
+from email.utils import formatdate, make_msgid
 
 from config import (
     SENDER_EMAIL, EMAIL_PASS, SMTP_HOST, SMTP_PORT,
-    MAX_ATTACHMENT_BYTES, MAX_RETRIES, RETRY_DELAY_SECONDS,
+    MAX_ATTACHMENT_BYTES, MAX_RETRIES, RETRY_DELAY_SECONDS, FLEET_NAME,
 )
 
-load_dotenv()  # Load .env file if present, so EMAIL_PASS can be set without editing config.py or the shell environment.
+
 class EmailConfigError(RuntimeError):
     """Raised when the email settings are incomplete."""
 
@@ -44,16 +43,26 @@ def _normalise_recipients(to):
     return recipients
 
 
-def build_message(to, subject, body, attachments=None):
+def build_message(to, subject, body, attachments=None, high_priority=True):
     """Builds the EmailMessage (separate from sending so it can be tested)."""
 
     recipients = _normalise_recipients(to)
 
     message = EmailMessage()
-    message["From"] = SENDER_EMAIL
+    message["From"] = f"{FLEET_NAME} Oilfield Monitor <{SENDER_EMAIL}>"
     message["To"] = ", ".join(recipients)
+    message["Reply-To"] = SENDER_EMAIL
     message["Subject"] = subject
     message["Date"] = formatdate(localtime=True)
+    message["Message-ID"] = make_msgid(domain=SENDER_EMAIL.split("@")[-1])
+
+    if high_priority:
+        # Understood by Gmail, Outlook and Apple Mail: shows the
+        # red "!" / "High importance" marker.
+        message["X-Priority"] = "1 (Highest)"
+        message["X-MSMail-Priority"] = "High"
+        message["Importance"] = "High"
+
     message.set_content(body)
 
     total_bytes = 0
@@ -81,7 +90,7 @@ def build_message(to, subject, body, attachments=None):
     return message, recipients
 
 
-def send_email(to, subject, body, attachments=None):
+def send_email(to, subject, body, attachments=None, high_priority=True):
     """
     Sends the email, retrying transient SMTP/network failures up to
     MAX_RETRIES times. Raises on configuration problems or if every
@@ -96,7 +105,8 @@ def send_email(to, subject, body, attachments=None):
             "App Password and set EMAIL_PASS before starting the app."
         )
 
-    message, recipients = build_message(to, subject, body, attachments)
+    message, recipients = build_message(to, subject, body, attachments,
+                                        high_priority)
     context = ssl.create_default_context()
     last_error = None
 
