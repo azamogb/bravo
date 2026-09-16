@@ -1,8 +1,8 @@
 import os
 import sqlite3
 import pandas as pd
-from config import DB_PATH,BASE_DIR
 
+from config import DB_PATH, CSV_PATH
 
 
 # --- 1. Connect (creates the .db file if missing) ---
@@ -11,10 +11,12 @@ conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # --- 2. Create the table if it doesn't exist yet ---
+# (Well_ID, Date) is the primary key so re-running this script
+# updates rows in place instead of appending duplicates every time.
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS production_data (
-        Well_ID TEXT,
-        Date TEXT,
+        Well_ID TEXT NOT NULL,
+        Date TEXT NOT NULL,
         Oil_Rate REAL,
         Gas_Rate REAL,
         GOR REAL,
@@ -24,22 +26,23 @@ cursor.execute("""
         Choke_Position REAL,
         Vibration REAL,
         Motor_Current REAL,
-        Pump_Status INTEGER
+        Pump_Status INTEGER,
+        PRIMARY KEY (Well_ID, Date)
     )
 """)
 
 # --- 3. Load the rows to insert from the existing CSV ---
-df_csv = pd.read_csv(os.path.join(BASE_DIR, 'production_data.csv'))
+df_csv = pd.read_csv(CSV_PATH)
 rows_list = list(df_csv.itertuples(index=False, name=None))
 
-# --- 4. Insert many rows at once ---
+# --- 4. Insert (or replace) many rows at once ---
 cursor.executemany(
-    "INSERT INTO production_data VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT OR REPLACE INTO production_data VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
     rows_list
 )
 conn.commit()
 
-print(f"Inserted {len(rows_list)} rows into production_data.")
+print(f"Inserted/updated {len(rows_list)} rows in production_data.")
 
 # --- 5. Read into DataFrame (example query) ---
 df = pd.read_sql_query(
@@ -50,30 +53,3 @@ df = pd.read_sql_query(
 print(df.head())
 
 conn.close()
-
-
-
-
-
-
-# import sqlite3
-# import pandas as pd
-
-# # Connect (creates file if missing)
-# conn = sqlite3.connect('data/oilfield.db')
-# cursor = conn.cursor()
-
-# # Insert many rows at once
-# cursor.executemany(
-#     "INSERT INTO production_data VALUES (?,?,?,?,?,?,?)",
-#     rows_list                    # list of tuples
-# )
-# conn.commit()
-
-# # Read into DataFrame (data_loader.py)
-# df = pd.read_sql_query(
-#     "SELECT * FROM production_data WHERE Well_ID = ?",
-#     conn,
-#     params=('WELL-01',)
-# )
-# conn.close()

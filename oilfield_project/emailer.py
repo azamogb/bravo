@@ -23,13 +23,14 @@ import smtplib
 import mimetypes
 from email.message import EmailMessage
 from email.utils import formatdate
+from dotenv import load_dotenv
 
 from config import (
     SENDER_EMAIL, EMAIL_PASS, SMTP_HOST, SMTP_PORT,
     MAX_ATTACHMENT_BYTES, MAX_RETRIES, RETRY_DELAY_SECONDS,
 )
 
-
+load_dotenv()  # Load .env file if present, so EMAIL_PASS can be set without editing config.py or the shell environment.
 class EmailConfigError(RuntimeError):
     """Raised when the email settings are incomplete."""
 
