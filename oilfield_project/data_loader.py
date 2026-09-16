@@ -30,39 +30,8 @@ _cache = None
 
 
 def _synthetic_data():
-    rng = random.Random(42)
-    start_date = datetime.date(2026, 4, 1)
-    rows = []
-
-    for well in WELL_IDS:
-        for day in range(NUM_DAYS):
-            is_failure = rng.random() < 0.15
-            pressure = rng.uniform(1200, 2800)
-
-            if is_failure:
-                pressure *= 0.6
-                oil_rate = rng.uniform(50, 120)
-                vibration = rng.uniform(4.0, 9.0)
-                motor_current = rng.uniform(80, 140)
-            else:
-                oil_rate = rng.uniform(200, 500)
-                vibration = rng.uniform(0.5, 3.0)
-                motor_current = rng.uniform(30, 60)
-
-            gas_rate = oil_rate * rng.uniform(0.8, 1.5)
-            gor = round((gas_rate * 1000) / oil_rate, 2) if oil_rate > 0 else 0
-
-            rows.append((
-                well,
-                (start_date + datetime.timedelta(days=day)).isoformat(),
-                round(oil_rate, 2), round(gas_rate, 2), gor,
-                round(rng.uniform(5, 60), 2), round(pressure, 2),
-                round(rng.uniform(60, 120), 2), round(rng.uniform(20, 100), 1),
-                round(vibration, 2), round(motor_current, 2),
-                1 if is_failure else 0,
-            ))
-
-    return pd.DataFrame(rows, columns=COLUMNS)
+    from generate_data import build_dataframe
+    return build_dataframe()
 
 
 def load_data(force_reload=False):
