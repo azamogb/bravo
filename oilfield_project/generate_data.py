@@ -7,7 +7,7 @@ from config import CSV_PATH, WELL_IDS, NUM_DAYS
 
 random.seed(42)
 
-start_date = datetime.date(2026, 4, 1)
+start_date = datetime.date(2026, 1, 4)
 rows = []
 
 for well in WELL_IDS:
