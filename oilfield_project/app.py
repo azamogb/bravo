@@ -1202,7 +1202,7 @@ for well in WELLS:
 forecast_card = dark_card(root)
 forecast_card.grid(row=3, column=1, sticky="nsew", padx=6, pady=(0, 6))
 panel_header(forecast_card, "ML FAILURE FORECAST ENGINE",
-             "Random Forest failure model (predict.py)" if ML_ACTIVE
+             "Machine-learning failure model (predict.py)" if ML_ACTIVE
              else "Rule-based estimate -- run train_model.py to enable the ML model")
 
 forecast_callout = tk.Frame(forecast_card, bg=PANEL_BG, highlightbackground=PANEL_BORDER,
