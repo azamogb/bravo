@@ -1,3 +1,4 @@
+#config.py
 import os
 
 
@@ -74,7 +75,6 @@ TARGET_COLUMN = "Pump_Status"
 # Everyone who receives the automatic high-risk alert emails.
 TECH_EMAIL = [
     'abdulmaleekarg01@gmail.com',
-    'enomfonakpanudo@gmail.com',
     'aniekemeoton46@gmail.com',
     'ogbchiazam@gmail.com',
     'agbochigozieanthony@gmail.com',
@@ -114,3 +114,36 @@ SMTP_PORT = 587
 MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024      # 25 MB, Gmail's per-message limit
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 5
+
+
+# ----------------------------------------------------------------
+# Dashboard theme (dark "control room" colour palette)
+#
+# Extracted verbatim from app.py -- used by app.py (widget colours)
+# and charts.py (matplotlib styling).
+# ----------------------------------------------------------------
+BG = "#0A0E17"            # window / outer background
+PANEL_BG = "#0F1626"      # card background
+PANEL_BORDER = "#1E3A52"  # subtle panel edge (unselected)
+ACCENT_CYAN = "#33D6FF"   # panel titles / glow border / selection
+
+TEXT = "#E8F1F5"
+MUTED = "#8FAFC4"
+
+GREEN = "#22E5A0"
+GREEN_DARK = "#149E72"
+YELLOW = "#FFD93D"
+ORANGE = "#FF9A3D"
+RED = "#FF4457"
+
+GRID = "#182838"
+
+# Status badge backgrounds, one per risk level
+BG_HIGH = "#2A1414"
+BG_WARN = "#2E2711"
+BG_NORMAL = "#0F2A20"
+
+UNSELECTED_BTN_BG = "#152238"
+
+MONO = "Consolas"
+SANS = "Segoe UI"
