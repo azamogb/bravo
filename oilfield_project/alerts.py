@@ -64,7 +64,7 @@ def _harsh_wave(phase):
     """Square wave with a little sine mixed in: piercing but not a pure
     buzz, the character of a real fire-alarm sounder."""
     s = math.sin(phase)
-    return 0.7 * (1.0 if s >= 0 else -1.0) + 0.3 * s
+    return 0.9 * (1.0 if s >= 0 else -1.0) + 0.9 * s
 
 
 def _sweep(samples, f_start, f_end, seconds):
@@ -77,7 +77,7 @@ def _sweep(samples, f_start, f_end, seconds):
         freq = f_start * (ratio ** t)
         phase += 2 * math.pi * freq / SAMPLE_RATE
         # short fade in/out so the loop never clicks
-        env = min(1.0, i / 400, (n - i) / 400)
+        env = min(1.0, i / 300, (n - i) / 200)
         samples.append(_harsh_wave(phase) * env)
 
 
@@ -85,7 +85,7 @@ def _tone(samples, freq, seconds):
     n = int(SAMPLE_RATE * seconds)
     for i in range(n):
         phase = 2 * math.pi * freq * i / SAMPLE_RATE
-        env = min(1.0, i / 300, (n - i) / 300)
+        env = min(1.0, i / 200, (n - i) / 100)
         samples.append(_harsh_wave(phase) * env)
 
 
@@ -96,12 +96,12 @@ def _build_alarm_wav(path):
 
     # Section 1: three rising "whoops" (evacuation siren)
     for _ in range(3):
-        _sweep(samples, 420, 1350, 0.55)
+        _sweep(samples, 220, 9350, 0.55)
 
     # Section 2: fast hi-lo klaxon
     for _ in range(5):
-        _tone(samples, 1250, 0.13)
-        _tone(samples, 850, 0.13)
+        _tone(samples, 8250, 0.13)
+        _tone(samples, 750, 0.13)
 
     peak = max(abs(s) for s in samples) or 1.0
     scale = 0.9 * 32767 / peak
