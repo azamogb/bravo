@@ -1,4 +1,4 @@
-﻿"""
+"""
 Shared "physics" for the fake wells.
 
 One function turns (well baseline, severity 0..1, timestamp) into a
