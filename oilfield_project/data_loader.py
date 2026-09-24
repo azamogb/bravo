@@ -1,9 +1,11 @@
 """
 Single entry point for reading well records.
 
-    load_data()        -> full DataFrame, every well, sorted by date
-    load_well(well)    -> one well's rows (optionally only the last N days)
-    list_wells()       -> the well IDs actually present in the data
+    load_data()                 -> full DataFrame, every well, sorted by date
+    load_data(force_reload=True)-> re-read the DB (use this when live_feed.py is running)
+    load_well(well, days=N)     -> one well's rows, optionally only the last N days
+    latest(well)                -> the most recent row for a well (live view)
+    list_wells()                -> the well IDs actually present in the data
 
 Reads from the SQLite database created by db_setup.py. If the database
 is missing or empty, falls back to an in-memory synthetic dataset
@@ -11,20 +13,12 @@ is missing or empty, falls back to an in-memory synthetic dataset
 """
 
 import os
-import random
 import sqlite3
-import datetime
 
 import pandas as pd
 
-from config import DB_PATH, WELL_IDS, NUM_DAYS
-
-
-COLUMNS = [
-    'Well_ID', 'Date', 'Oil_Rate', 'Gas_Rate', 'GOR', 'Water_Cut',
-    'Pressure', 'Temperature', 'Choke_Position', 'Vibration',
-    'Motor_Current', 'Pump_Status'
-]
+from config import DB_PATH
+from simulator import COLUMNS
 
 _cache = None
 
@@ -35,8 +29,11 @@ def _synthetic_data():
 
 
 def load_data(force_reload=False):
-    """Returns every well's records as a DataFrame (cached after first read)."""
+    """Returns every well's records as a DataFrame.
 
+    Cached after the first read. Pass force_reload=True to pick up rows
+    that live_feed.py has written since the last call.
+    """
     global _cache
 
     if _cache is not None and not force_reload:
@@ -57,6 +54,7 @@ def load_data(force_reload=False):
         print("data_loader: database missing or empty, using synthetic data.")
         df = _synthetic_data()
 
+    df = df[COLUMNS]
     df["Date"] = pd.to_datetime(df["Date"])
     df = (
         df.drop_duplicates(subset=["Well_ID", "Date"], keep="last")
@@ -68,16 +66,26 @@ def load_data(force_reload=False):
     return df.copy()
 
 
-def load_well(well, days=None):
-    """Returns one well's records, newest last. days=N keeps only the last N."""
+def load_well(well, days=None, force_reload=False):
+    """Returns one well's records, newest last.
 
-    df = load_data()
+    days=N keeps only the rows from the last N days of that well's data
+    (time-based, so it works whether rows are hourly or per-minute).
+    """
+    df = load_data(force_reload=force_reload)
     well_df = df[df["Well_ID"] == well]
 
-    if days is not None:
-        well_df = well_df.tail(days)
+    if days is not None and not well_df.empty:
+        cutoff = well_df["Date"].max() - pd.Timedelta(days=days)
+        well_df = well_df[well_df["Date"] >= cutoff]
 
     return well_df.reset_index(drop=True)
+
+
+def latest(well, force_reload=True):
+    """The most recent row for a well, as a Series (None if no data)."""
+    well_df = load_well(well, force_reload=force_reload)
+    return None if well_df.empty else well_df.iloc[-1]
 
 
 def list_wells():

@@ -7,6 +7,8 @@ DB_PATH = os.path.join(BASE_DIR, 'data', 'oilfield.db')
 CSV_PATH = os.path.join(BASE_DIR, 'production_data.csv')
 
 
+
+
 # ----------------------------------------------------------------
 # .env loader (no extra package needed)
 #
@@ -18,6 +20,18 @@ CSV_PATH = os.path.join(BASE_DIR, 'production_data.csv')
 # Values from .env take priority over anything set with setx, so a
 # stale Windows variable can never override the team account.
 # ----------------------------------------------------------------
+
+
+# --- Wells & data generation ---
+WELL_IDS = [f'WELL-0{i}' for i in range(1, 6)]
+NUM_DAYS = 90               # days of history to generate
+HISTORY_STEP_MINUTES = 60   # one history row per hour
+LIVE_INTERVAL_SECONDS = 60  # live feed: one new row per well per minute
+
+
+
+
+
 def _load_dotenv(path):
     values = {}
     if not os.path.isfile(path):
@@ -103,7 +117,6 @@ VIBRATION_ANOMALY_MM_S = 3.5        # mm/s
 
 # --- Wells & data generation ---
 WELL_IDS = [f'WELL-0{i}' for i in range(1, 6)]
-NUM_DAYS = 30
 
 
 # --- Email ---
@@ -147,3 +160,4 @@ UNSELECTED_BTN_BG = "#152238"
 
 MONO = "Consolas"
 SANS = "Segoe UI"
+

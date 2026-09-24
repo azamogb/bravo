@@ -17,7 +17,7 @@ except ImportError:
 from alerts import play_alert_sound_async, stop_alert_sound
 from emailer import send_email
 import reports
-from data_loader import load_well, list_wells
+from data_loader import load_data, load_well, list_wells
 from charts import (
     make_chart, draw_gauge, chart_plot_telemetry, chart_plot_fft,
     chart_plot_esp, chart_plot_choke,
@@ -28,12 +28,17 @@ from predict import (
 )
 from config import (
     TECH_EMAIL, ALERT_COOLDOWN_SECONDS, AUTO_MONITOR_INTERVAL_MS,
+    LIVE_INTERVAL_SECONDS,
     RISK_THRESHOLD, FLEET_NAME, FEATURE_COLUMNS,
     MOTOR_CURRENT_OVERLOAD_A, VIBRATION_ANOMALY_MM_S,
     BG, PANEL_BG, PANEL_BORDER, ACCENT_CYAN, TEXT, MUTED,
     GREEN, GREEN_DARK, YELLOW, ORANGE, RED, GRID,
     BG_HIGH, BG_WARN, BG_NORMAL, UNSELECTED_BTN_BG, MONO, SANS,
 )
+
+# How often the dashboard re-reads the database for new rows written
+# by live_feed.py. Matches the feed's own cadence.
+LIVE_REFRESH_MS = int(LIVE_INTERVAL_SECONDS * 1000)
 
 
 # ----------------------------------------------------------------
@@ -97,6 +102,7 @@ last_alert_sent_at = {}
 banner_flash_job = None
 banner_flash_on = False
 auto_monitor_job = None
+live_refresh_job = None
 
 asset_rows = {}
 period_buttons = {}
@@ -116,6 +122,7 @@ forecast_line2 = None
 esp_value_label = None
 pump_status_label = None
 choke_value_label = None
+last_data_label = None
 
 
 # ----------------------------------------------------------------
@@ -330,6 +337,10 @@ def auto_monitor_tick():
     if not auto_monitor_var.get():
         return
 
+    # Pull in whatever live_feed.py has written since the last pass,
+    # so the risk scores are computed on the newest rows.
+    load_data(force_reload=True)
+
     any_high_risk = False
 
     for well in WELLS:
@@ -341,6 +352,13 @@ def auto_monitor_tick():
             trigger_high_risk_alert(well, forecast)
 
     update_well_status()
+
+    # Keep the gauge and callout for the selected well current too.
+    selected = well_var.get()
+    if selected in well_risk_cache and current_gauge_risk is not None:
+        forecast = predict_failure(selected)
+        draw_risk_gauge(forecast["risk"])
+        set_forecast(selected, forecast)
 
     if not any_high_risk:
         stop_banner_flash()
@@ -395,6 +413,23 @@ def refresh_panels():
     plot_wellhead()
 
 
+def live_refresh_tick():
+    """Re-reads the database every LIVE_REFRESH_MS and redraws the panels,
+    so rows written by live_feed.py show up as they arrive."""
+    global live_refresh_job
+
+    try:
+        df = load_data(force_reload=True)
+        latest_ts = df["Date"].max()
+        last_data_label.config(
+            text=f"LAST DATA: {latest_ts:%Y-%m-%d %H:%M}   ")
+        refresh_panels()
+    except Exception as error:
+        print(f"live refresh failed: {error}")
+
+    live_refresh_job = window.after(LIVE_REFRESH_MS, live_refresh_tick)
+
+
 # ----------------------------------------------------------------
 # ML Failure Forecast callout
 # ----------------------------------------------------------------
@@ -426,6 +461,7 @@ def set_forecast(well, forecast):
 
 def run_diagnostics():
     well = well_var.get()
+    load_data(force_reload=True)
     forecast = predict_failure(well)
     well_risk_cache[well] = forecast["risk"]
 
@@ -718,6 +754,9 @@ tk.Label(title_frame, text="   \u25cf LIVE MONITORING", font=(MONO, 9, "bold"),
 clock_label = tk.Label(header, text="", font=(MONO, 10), bg=BG, fg=MUTED)
 clock_label.pack(side="right")
 
+last_data_label = tk.Label(header, text="", font=(MONO, 9), bg=BG, fg=GREEN)
+last_data_label.pack(side="right")
+
 
 def tick_clock():
     clock_label.config(text=datetime.now().strftime("%Y-%m-%d  |  %H:%M:%S"))
@@ -767,7 +806,7 @@ ttk.Checkbutton(control_inner, text="Auto-Monitor All Wells",
 tk.Label(control_inner, text="Period:", font=(MONO, 9, "bold"), bg=PANEL_BG,
          fg=MUTED).pack(side="left", padx=(24, 6))
 
-for days, label in [(7, "7 Days"), (15, "15 Days"), (30, "30 Days")]:
+for days, label in [(1, "24 Hrs"), (7, "7 Days"), (15, "15 Days"), (30, "30 Days")]:
     button = tk.Button(control_inner, text=label, font=(SANS, 8, "bold"),
                        bg=UNSELECTED_BTN_BG, fg=TEXT, bd=0, relief="flat",
                        cursor="hand2", padx=10, pady=5,
@@ -991,11 +1030,16 @@ status_message.config(
     fg=MUTED)
 
 # The KPI progress bars need real widget widths, so draw everything
-# once the window has laid itself out.
-window.after(100, refresh_panels)
+# once the window has laid itself out, then keep polling the DB for
+# new live rows.
+window.after(100, live_refresh_tick)
 
 
 def on_close():
+    if live_refresh_job is not None:
+        window.after_cancel(live_refresh_job)
+    if auto_monitor_job is not None:
+        window.after_cancel(auto_monitor_job)
     stop_alert_sound()
     window.destroy()
 
